@@ -41,7 +41,28 @@ then
   	then
 		echo mam_id passed on command line is invalid
 		exit 1
+	else
+		grep mam_id ${COOKIEFILE} > /dev/null 2>/dev/null
+		if [ $? -ne 0 ]
+		then
+			echo Command successful, but failed to create cookie file.
+			exit 1
+		else
+			echo New session created.
+		fi
 	fi
+else
+	curl -s -b ${COOKIEFILE} -c ${COOKIEFILE} https://t.myanonamouse.net/json/dynamicSeedbox.php > /tmp/MAM.output
+	grep '"Success":true' /tmp/MAM.output > /dev/null 2>/dev/null
+  	if [ $? -ne 0 ]
+  	then
+		echo response: `cat /tmp/MAM.output`
+		echo Current cookie file is invalid.  Please delete it, set the mam_id, and restart the container.
+		exit 1
+	else
+		echo Session is valid
+	fi
+
 fi
 
 OLDIP=`cat $CACHEFILE 2>/dev/null`
@@ -65,7 +86,8 @@ do
 		grep -E 'No Session Cookie|Invalid session' /tmp/MAM.output > /dev/null 2>/dev/null
 		if [ $? -eq 0 ]
 		then
-			echo Invalid session
+			echo response: `cat /tmp/MAM.output`
+			echo Current cookie file is invalid.  Please delete it, set the mam_id, and restart the container.
 			exit 1
 		fi
 	
@@ -83,7 +105,8 @@ do
 			then
 				echo Last update too recent - sleeping
 			else
-				echo Invalid response \"`cat /tmp/MAM.output`\"
+				echo response: `cat /tmp/MAM.output`
+				echo Invalid response
 				exit 1
 			fi
   		fi
@@ -91,4 +114,7 @@ do
 		echo "No IP change detected: `date`"
 	fi
 	sleep $SLEEPTIME
+
+	# Empty the IP file if it has not been rotated for more than 30 days, this will enforce session freshness.
+	find $CACHEFILE -mtime +30 -delete
 done
